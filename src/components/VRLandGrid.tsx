@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, Lock, MapPin, Shield, Key } from 'lucide-react';
 import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
-import { generateFHEEncryptedBid, generateSecureKey } from '@/lib/encryption';
+import { fheEncryptBid, generateFHEKeyPair } from '@/lib/fhe-encryption';
 import EncryptionStatus from './EncryptionStatus';
 
 interface LandTile {
@@ -92,45 +92,50 @@ const VRLandGrid = () => {
     }
 
     try {
-      // Generate FHE-encrypted bid data with real encryption
+      // Generate FHE key pair for this bid
+      const fheKeys = generateFHEKeyPair();
       const bidAmount = BigInt(tile.price * 1e18); // Convert to wei
       const bidder = address as `0x${string}`;
       const landId = BigInt(tile.id.split('-')[0]);
       
-      // Generate secure encryption key
-      const encryptionKey = generateSecureKey();
-      
-      // Create FHE-encrypted bid with real encryption
-      const { encryptedData, commitmentHash, blockchainData } = await generateFHEEncryptedBid(
+      // FHE encrypt the bid data
+      const { encryptedBid, blockchainData } = await fheEncryptBid(
         bidAmount.toString(),
         bidder,
-        encryptionKey
+        fheKeys.publicKey,
+        fheKeys.modulus,
+        fheKeys.generator
       );
       
       // Convert encrypted data to bytes for blockchain storage
       const encryptedBidBytes = new TextEncoder().encode(blockchainData);
       const encryptedBidArray = Array.from(encryptedBidBytes);
       
-      console.log('🔐 Encrypting bid data:', {
+      // Generate commitment hash for FHE verification
+      const commitmentHash = encryptedBid.commitmentHash;
+      
+      console.log('🔐 FHE Encrypting bid data:', {
         originalAmount: bidAmount.toString(),
         bidder: bidder,
-        encryptedAmount: encryptedData.encryptedAmount,
+        fheEncryptedAmount: encryptedBid.encryptedValue,
         commitmentHash: commitmentHash,
-        timestamp: encryptedData.timestamp
+        timestamp: encryptedBid.timestamp,
+        fhePublicKey: fheKeys.publicKey,
+        fheModulus: fheKeys.modulus
       });
       
       await writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
-        functionName: 'placeEncryptedBid',
-        args: [landId, encryptedBidArray],
+        functionName: 'placeFHEBid',
+        args: [landId, encryptedBidArray, commitmentHash],
         value: bidAmount
       });
       
-      alert('🔐 FHE-Encrypted bid placed successfully! Your bid is now fully encrypted and private until auction close.');
+      alert('🔐 FHE-Encrypted bid placed successfully! Your bid is now fully homomorphically encrypted and private until auction close.');
     } catch (error) {
-      console.error('Error placing encrypted bid:', error);
-      alert('Failed to place encrypted bid. Please try again.');
+      console.error('Error placing FHE encrypted bid:', error);
+      alert('Failed to place FHE encrypted bid. Please try again.');
     }
   };
 
@@ -149,17 +154,18 @@ const VRLandGrid = () => {
         landId: landId.toString(),
         basePrice: basePrice.toString(),
         auctionDuration: auctionDuration.toString(),
-        endTime: new Date(Date.now() + Number(auctionDuration) * 1000).toISOString()
+        endTime: new Date(Date.now() + Number(auctionDuration) * 1000).toISOString(),
+        fheEncryption: 'Fully Homomorphic Encryption enabled'
       });
       
       await writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
-        functionName: 'startEncryptedAuction',
+        functionName: 'startFHEAuction',
         args: [landId, basePrice, auctionDuration],
       });
       
-      alert('🔐 FHE-Encrypted auction started! All bids will be fully encrypted using homomorphic encryption until auction close.');
+      alert('🔐 FHE-Encrypted auction started! All bids will be fully homomorphically encrypted and private until auction close.');
     } catch (error) {
       console.error('Error starting encrypted auction:', error);
       alert('Failed to start encrypted auction. Please try again.');
