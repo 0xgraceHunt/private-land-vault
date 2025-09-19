@@ -1,4 +1,4 @@
-import { keccak256, toUtf8Bytes } from 'viem';
+import { keccak256 } from 'viem';
 
 /**
  * Advanced encryption utilities for FHE (Fully Homomorphic Encryption) simulation
@@ -50,7 +50,8 @@ export async function createBidSignature(
   
   // In a real implementation, this would use proper cryptographic signing
   // For now, we'll create a deterministic signature
-  return keccak256(toUtf8Bytes(messageHashHex + privateKey));
+  const data = new TextEncoder().encode(messageHashHex + privateKey);
+  return keccak256(data);
 }
 
 /**
