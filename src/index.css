@@ -1,0 +1,190 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Metaverse Land Sales Design System - All colors MUST be HSL */
+
+@layer base {
+  :root {
+    /* Core cosmic theme */
+    --background: 220 30% 6%;
+    --foreground: 220 15% 95%;
+
+    /* Cards and surfaces with glass morphism */
+    --card: 220 25% 8%;
+    --card-foreground: 220 15% 95%;
+
+    --popover: 220 30% 10%;
+    --popover-foreground: 220 15% 95%;
+
+    /* Primary neon cyan theme */
+    --primary: 190 100% 50%;
+    --primary-foreground: 220 30% 8%;
+
+    /* Secondary holographic purple */
+    --secondary: 270 70% 20%;
+    --secondary-foreground: 270 30% 90%;
+
+    /* Muted cosmic grays */
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 15% 65%;
+
+    /* Accent electric blue */
+    --accent: 210 100% 60%;
+    --accent-foreground: 220 30% 8%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Borders with subtle glow */
+    --border: 220 30% 18%;
+    --input: 220 25% 12%;
+    --ring: 190 100% 50%;
+
+    /* Cosmic gradients */
+    --gradient-cosmic: linear-gradient(135deg, hsl(220 30% 6%), hsl(270 70% 12%), hsl(220 30% 6%));
+    --gradient-neon: linear-gradient(90deg, hsl(190 100% 50%), hsl(210 100% 60%), hsl(270 70% 60%));
+    --gradient-glass: linear-gradient(145deg, hsla(220 25% 15% / 0.8), hsla(220 30% 12% / 0.4));
+    
+    /* Glows and effects */
+    --glow-primary: 0 0 20px hsl(190 100% 50% / 0.5);
+    --glow-accent: 0 0 30px hsl(210 100% 60% / 0.3);
+    --glow-subtle: 0 0 10px hsl(220 50% 80% / 0.1);
+
+    /* Animations */
+    --transition-glow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.2s ease-out;
+
+    --radius: 1rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  /* Dark mode maintains cosmic theme with deeper backgrounds */
+  .dark {
+    --background: 220 35% 4%;
+    --card: 220 30% 6%;
+    --gradient-cosmic: linear-gradient(135deg, hsl(220 35% 4%), hsl(270 80% 8%), hsl(220 35% 4%));
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background: var(--gradient-cosmic);
+    min-height: 100vh;
+  }
+
+  /* Cosmic scroll effects */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, hsl(var(--primary)), hsl(var(--accent)));
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  /* Neon glow effects */
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+  
+  .glow-accent {
+    box-shadow: var(--glow-accent);
+  }
+  
+  .glow-subtle {
+    box-shadow: var(--glow-subtle);
+  }
+
+  /* Glass morphism */
+  .glass {
+    background: var(--gradient-glass);
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--border));
+  }
+
+  /* Holographic text effect */
+  .holographic {
+    background: var(--gradient-neon);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: holographic 3s ease-in-out infinite alternate;
+  }
+
+  /* Land tile hover effects */
+  .land-tile {
+    @apply glass glow-subtle hover:glow-primary;
+    transition: var(--transition-glow);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .land-tile::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: var(--gradient-neon);
+    z-index: -1;
+    opacity: 0;
+    transition: var(--transition-glow);
+  }
+
+  .land-tile:hover::before {
+    opacity: 0.3;
+  }
+
+  /* Rotating animation */
+  .rotate-slow {
+    animation: rotate-slow 20s linear infinite;
+  }
+
+  /* Pulse glow animation */
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes holographic {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(90deg); }
+}
+
+@keyframes rotate-slow {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: var(--glow-primary); }
+  100% { box-shadow: var(--glow-accent); }
+}
