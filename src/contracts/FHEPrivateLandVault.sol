@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import { SepoliaConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
+import { euint32, externalEuint32, euint8, ebool, FHE } from "@fhevm/solidity/lib/FHE.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -17,39 +19,28 @@ contract FHEPrivateLandVault is ERC721, ERC721URIStorage, Ownable, ReentrancyGua
     
     Counters.Counter private _tokenIdCounter;
     
-    // FHE encryption parameters
-    struct FHEParams {
-        bytes32 publicKey;      // FHE public key
-        bytes32 privateKey;     // FHE private key (encrypted)
-        uint256 modulus;        // FHE modulus
-        uint256 generator;      // FHE generator
-    }
-    
     // Land plot structure with FHE encrypted data
     struct LandPlot {
         uint256 x;
         uint256 y;
-        bytes encryptedBasePrice;    // FHE encrypted base price
+        euint32 encryptedBasePrice;    // FHE encrypted base price
         bool isAvailable;
         bool isEncrypted;
         address currentOwner;
         uint256 auctionEndTime;
         string metadataURI;
-        bytes encryptedMetadata;      // FHE encrypted metadata
+        euint32 encryptedMetadata;      // FHE encrypted metadata
     }
     
     // FHE encrypted bid structure
     struct FHEEncryptedBid {
-        bytes encryptedAmount;       // FHE encrypted bid amount
-        bytes encryptedBidder;       // FHE encrypted bidder address
-        bytes encryptedTimestamp;    // FHE encrypted timestamp
-        bytes commitmentHash;        // Commitment hash for verification
-        uint256 revealTime;         // Time when bid can be revealed
+        euint32 encryptedAmount;       // FHE encrypted bid amount
+        euint32 encryptedBidder;       // FHE encrypted bidder address
+        euint32 encryptedTimestamp;    // FHE encrypted timestamp
+        bytes32 commitmentHash;        // Commitment hash for verification
+        uint256 revealTime;           // Time when bid can be revealed
         bool isRevealed;
     }
-    
-    // FHE encryption state
-    FHEParams public fheParams;
     
     // Mapping from tokenId to land plot
     mapping(uint256 => LandPlot) public landPlots;
@@ -64,62 +55,53 @@ contract FHEPrivateLandVault is ERC721, ERC721URIStorage, Ownable, ReentrancyGua
     mapping(bytes32 => bool) public validCommitments;
     
     // Events
-    event LandPlotCreated(uint256 indexed tokenId, uint256 x, uint256 y, bytes encryptedBasePrice);
-    event FHEAuctionStarted(uint256 indexed tokenId, bytes encryptedBasePrice, uint256 duration);
-    event FHEBidPlaced(uint256 indexed tokenId, address indexed bidder, bytes commitmentHash);
+    event LandPlotCreated(uint256 indexed tokenId, uint256 x, uint256 y, euint32 encryptedBasePrice);
+    event FHEAuctionStarted(uint256 indexed tokenId, euint32 encryptedBasePrice, uint256 duration);
+    event FHEBidPlaced(uint256 indexed tokenId, address indexed bidder, bytes32 commitmentHash);
     event FHEBidRevealed(uint256 indexed tokenId, address indexed bidder, uint256 bidAmount);
     event LandSold(uint256 indexed tokenId, address indexed buyer, uint256 finalPrice);
-    event FHEParamsUpdated(bytes32 newPublicKey, uint256 newModulus);
+    event FHEBidDecrypted(uint256 indexed tokenId, address indexed bidder, uint256 decryptedAmount);
     
     constructor() ERC721("FHEPrivateLandVault", "FHEPLV") {
-        // Initialize FHE parameters
-        fheParams = FHEParams({
-            publicKey: keccak256(abi.encodePacked("fhe_public_key", block.timestamp)),
-            privateKey: keccak256(abi.encodePacked("fhe_private_key", block.timestamp)),
-            modulus: 2**256 - 1,
-            generator: 2
-        });
+        // FHEVM handles FHE initialization automatically
     }
     
     /**
-     * @dev FHE encrypt a value using the contract's public key
+     * @dev FHE encrypt a value using FHEVM
      * @param value The value to encrypt
      * @return encrypted The FHE encrypted value
      */
-    function _fheEncrypt(uint256 value) internal view returns (bytes memory) {
-        // Simplified FHE encryption using modular exponentiation
-        // In production, this would use proper FHE libraries
-        uint256 encrypted = _modPow(fheParams.generator, value, fheParams.modulus);
-        return abi.encodePacked(encrypted);
+    function _fheEncrypt(uint32 value) internal view returns (euint32) {
+        return FHE.asEuint32(value);
     }
     
     /**
-     * @dev FHE decrypt a value using the contract's private key
+     * @dev FHE decrypt a value using FHEVM
      * @param encrypted The encrypted value
      * @return decrypted The decrypted value
      */
-    function _fheDecrypt(bytes memory encrypted) internal view returns (uint256) {
-        // Simplified FHE decryption
-        // In production, this would use proper FHE libraries
-        uint256 encryptedValue = abi.decode(encrypted, (uint256));
-        return _modPow(encryptedValue, fheParams.privateKey, fheParams.modulus);
+    function _fheDecrypt(euint32 encrypted) internal view returns (uint32) {
+        return FHE.decrypt(encrypted);
     }
     
     /**
-     * @dev Modular exponentiation for FHE operations
+     * @dev FHE add two encrypted values
+     * @param a First encrypted value
+     * @param b Second encrypted value
+     * @return result The encrypted sum
      */
-    function _modPow(uint256 base, uint256 exponent, uint256 modulus) internal pure returns (uint256) {
-        if (modulus == 1) return 0;
-        uint256 result = 1;
-        base = base % modulus;
-        while (exponent > 0) {
-            if (exponent % 2 == 1) {
-                result = (result * base) % modulus;
-            }
-            exponent = exponent >> 1;
-            base = (base * base) % modulus;
-        }
-        return result;
+    function _fheAdd(euint32 a, euint32 b) internal pure returns (euint32) {
+        return FHE.add(a, b);
+    }
+    
+    /**
+     * @dev FHE compare two encrypted values
+     * @param a First encrypted value
+     * @param b Second encrypted value
+     * @return result True if a > b
+     */
+    function _fheGt(euint32 a, euint32 b) internal pure returns (ebool) {
+        return FHE.gt(a, b);
     }
     
     /**
@@ -132,7 +114,7 @@ contract FHEPrivateLandVault is ERC721, ERC721URIStorage, Ownable, ReentrancyGua
     function createLandPlot(
         uint256 x,
         uint256 y,
-        uint256 basePrice,
+        uint32 basePrice,
         string memory metadataURI
     ) external onlyOwner {
         require(coordinateToTokenId[x][y] == 0, "Land plot already exists at these coordinates");
@@ -140,11 +122,12 @@ contract FHEPrivateLandVault is ERC721, ERC721URIStorage, Ownable, ReentrancyGua
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
         
-        // FHE encrypt the base price
-        bytes memory encryptedPrice = _fheEncrypt(basePrice);
+        // FHE encrypt the base price using FHEVM
+        euint32 encryptedPrice = _fheEncrypt(basePrice);
         
-        // FHE encrypt metadata
-        bytes memory encryptedMetadata = _fheEncrypt(uint256(keccak256(abi.encodePacked(metadataURI))));
+        // FHE encrypt metadata hash
+        uint32 metadataHash = uint32(uint256(keccak256(abi.encodePacked(metadataURI))));
+        euint32 encryptedMetadata = _fheEncrypt(metadataHash);
         
         landPlots[tokenId] = LandPlot({
             x: x,
@@ -171,7 +154,7 @@ contract FHEPrivateLandVault is ERC721, ERC721URIStorage, Ownable, ReentrancyGua
      */
     function startFHEAuction(
         uint256 tokenId, 
-        uint256 basePrice, 
+        uint32 basePrice, 
         uint256 auctionDuration
     ) external onlyOwner {
         require(_exists(tokenId), "Token does not exist");
@@ -197,21 +180,24 @@ contract FHEPrivateLandVault is ERC721, ERC721URIStorage, Ownable, ReentrancyGua
      */
     function placeFHEBid(
         uint256 tokenId, 
-        bytes memory encryptedBidData,
+        euint32 encryptedAmount,
         bytes32 commitmentHash
     ) external payable {
         require(_exists(tokenId), "Token does not exist");
         require(landPlots[tokenId].isEncrypted, "Land plot is not in FHE auction");
         require(block.timestamp < landPlots[tokenId].auctionEndTime, "Auction has ended");
-        require(encryptedBidData.length > 0, "Encrypted bid data cannot be empty");
         require(commitmentHash != bytes32(0), "Commitment hash cannot be empty");
         require(msg.value > 0, "Bid must include ETH");
         
+        // FHE encrypt bidder address and timestamp
+        uint32 bidderHash = uint32(uint256(uint160(msg.sender)));
+        uint32 timestamp = uint32(block.timestamp);
+        
         // Store the FHE encrypted bid
         fheEncryptedBids[tokenId].push(FHEEncryptedBid({
-            encryptedAmount: encryptedBidData,
-            encryptedBidder: _fheEncrypt(uint256(uint160(msg.sender))),
-            encryptedTimestamp: _fheEncrypt(block.timestamp),
+            encryptedAmount: encryptedAmount,
+            encryptedBidder: _fheEncrypt(bidderHash),
+            encryptedTimestamp: _fheEncrypt(timestamp),
             commitmentHash: commitmentHash,
             revealTime: block.timestamp + 1 hours, // 1 hour reveal delay
             isRevealed: false
